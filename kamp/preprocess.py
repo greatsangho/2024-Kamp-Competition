@@ -19,7 +19,7 @@ NAN_GRID = {
 ENCODE_GRID = {
     'working' : ['정지', '가동'],
     'tryshot_signal' : ['No', 'D'],
-    'heating_furnace' : ['A', 'B', 'C'],
+    'heating_furnace' : ['A', 'B', 'C', 'D'],
     'mold_code' : [8412, 8413, 8573, 8576, 8600, 8722, 8917]
 }
 
@@ -58,10 +58,13 @@ class NanProcessor:
     def process(self, data):
         data = data.dropna(subset=['passorfail'])
 
-        data = data.drop(columns=self.drop_features)
-
         for feature, fill_val in self.simple_fill_dict.items():
-            data[feature] = data[feature].fillna(fill_val)
+            if feature == 'heating_furnace':
+                condition = (data[feature].isna()) & (data['molten_volume'].isna())
+                data.loc[condition, feature] = data.loc[condition, feature].fillna('D').astype('object')
+            data.loc[:,feature] = data.loc[:, feature].fillna(fill_val)
+        
+        data = data.drop(columns=self.drop_features)
         
         for feature in self.mode_fill_features:
             data[feature] = data.groupby(self.mode_criterion)[feature].transform(
@@ -192,8 +195,17 @@ class DataResampler:
         train_label = pd.concat([train_label[fail_data.index], downsampled_pass_label], axis=0).reset_index(drop=True)
 
 
-        smote = SMOTE(sampling_strategy=0.15, random_state=42)
+        smote = SMOTE(sampling_strategy=self.upsampled_total_fail_rate, random_state=42)
         train_data, train_label = smote.fit_resample(train_data, train_label)
+
+
+        # remapping_features = ['working', 'EMS_operation_time', 'mold_code', 'heating_furnace']
+        # for feature in remapping_features:
+        #     train_data[feature] = train_data[feature].apply(lambda x : round(x))
+
+
+
+
 
         return train_data, train_label, test_data, test_label
 
@@ -287,7 +299,9 @@ class KampDataLoader:
         data_input = pd.DataFrame(data_input, columns=input_feature_names)
         print("[process Log] Done\n")
 
-        
+        remapping_features = ['working', 'EMS_operation_time', 'mold_code', 'heating_furnace']
+        for feature in remapping_features:
+            data_input[feature] = data_input[feature].apply(lambda x : round(x))
 
         # 학습-평가 데이터 분할
         print("[process Log] Train Test Spliting...")
@@ -304,6 +318,9 @@ class KampDataLoader:
             print("[process Log] Data Resampling...")
             x_train, y_train, x_test, y_test = DataResampler(downsampled_pass_rate=self.downsampled_pass_rate, upsampled_total_fail_rate=self.upsampled_total_fail_rate).process(train_data, train_label, test_data, test_label)
             print("[process Log] Done\n")
+        
+        print(f"train : {train_data['mold_code'].unique()}")
+        print(f"test : {test_data['mold_code'].unique()}")
 
         self.data = {
             'train_data' : x_train,
