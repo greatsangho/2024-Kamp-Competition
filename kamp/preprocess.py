@@ -318,8 +318,8 @@ class KampDataLoader:
         self.p_threshold = p_threshold
         self.get_useful_p_data = get_useful_p_data
 
-        self.do_resample=True,
-        self.downsampled_pass_rate= downsampled_pass_rate
+        self.do_resample = do_resample,
+        self.downsampled_pass_rate = downsampled_pass_rate
         self.upsampled_fail_rate_about_pass = upsampled_fail_rate_about_pass
         self.upsample_method = upsample_method
 
