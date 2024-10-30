@@ -19,7 +19,8 @@ NAN_GRID = {
 ENCODE_GRID = {
     'working' : ['정지', '가동'],
     'tryshot_signal' : ['No', 'D'],
-    'heating_furnace' : ['A', 'B', 'C', 'D'],
+    # 'heating_furnace' : ['A', 'B', 'C', 'D'],
+    'heating_furnace' : ['A', 'B', 'C'],
     'mold_code' : [8412, 8413, 8573, 8576, 8600, 8722, 8917]
 }
 
@@ -63,6 +64,9 @@ class NanProcessor:
                 condition = (data[feature].isna()) & (data['molten_volume'].isna())
                 data.loc[condition, feature] = data.loc[condition, feature].fillna('D').astype('object')
             data.loc[:,feature] = data.loc[:, feature].fillna(fill_val)
+        
+        condition = ~(data['heating_furnace'] == 'D')
+        data = data.loc[condition, :]
         
         data = data.drop(columns=self.drop_features)
         
@@ -318,9 +322,6 @@ class KampDataLoader:
             print("[process Log] Data Resampling...")
             x_train, y_train, x_test, y_test = DataResampler(downsampled_pass_rate=self.downsampled_pass_rate, upsampled_total_fail_rate=self.upsampled_total_fail_rate).process(train_data, train_label, test_data, test_label)
             print("[process Log] Done\n")
-        
-        print(f"train : {train_data['mold_code'].unique()}")
-        print(f"test : {test_data['mold_code'].unique()}")
 
         self.data = {
             'train_data' : x_train,
