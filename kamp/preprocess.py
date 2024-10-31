@@ -170,11 +170,11 @@ class DataResampler:
         self.upsample_method = upsample_method
         self.with_pca = with_pca
     
-    def process(self, train_data, train_label, test_data, test_label):
-        train_data = train_data.reset_index(drop=True)
-        test_data = test_data.reset_index(drop=True)
-        train_label = train_label.reset_index(drop=True)
-        test_label = test_label.reset_index(drop=True)
+    def process(self, train_data, train_label):
+        # train_data = train_data.reset_index(drop=True)
+        # test_data = test_data.reset_index(drop=True)
+        # train_label = train_label.reset_index(drop=True)
+        # test_label = test_label.reset_index(drop=True)
 
         fail_data = train_data[train_label == 1]
         pass_data = train_data[train_label == 0]
@@ -196,16 +196,16 @@ class DataResampler:
             )
         downsampled_pass_label = train_label[downsampled_pass_data.index]
 
-        not_used_pass_data = pass_data.drop(downsampled_pass_data.index)
-        not_used_pass_label = train_label[pass_data.index].drop(downsampled_pass_data.index)
+        # not_used_pass_data = pass_data.drop(downsampled_pass_data.index)
+        # not_used_pass_label = train_label[pass_data.index].drop(downsampled_pass_data.index)
 
         downsampled_pass_data = downsampled_pass_data.reset_index(drop=True)
         downsampled_pass_label = downsampled_pass_label.reset_index(drop=True)
-        not_used_pass_data = not_used_pass_data.reset_index(drop=True)
-        not_used_pass_label = not_used_pass_label.reset_index(drop=True)
+        # not_used_pass_data = not_used_pass_data.reset_index(drop=True)
+        # not_used_pass_label = not_used_pass_label.reset_index(drop=True)
 
-        test_data = pd.concat([test_data, not_used_pass_data], axis=0).reset_index(drop=True)
-        test_label = pd.concat([test_label, not_used_pass_label], axis=0).reset_index(drop=True)
+        # test_data = pd.concat([test_data, not_used_pass_data], axis=0).reset_index(drop=True)
+        # test_label = pd.concat([test_label, not_used_pass_label], axis=0).reset_index(drop=True)
 
         train_data = pd.concat([fail_data, downsampled_pass_data], axis=0).reset_index(drop=True)
         train_label = pd.concat([train_label[fail_data.index], downsampled_pass_label], axis=0).reset_index(drop=True)
@@ -222,7 +222,7 @@ class DataResampler:
             train_data, train_label = adasyn.fit_resample(train_data, train_label)
 
 
-        return train_data, train_label, test_data, test_label
+        return train_data, train_label
 
 
 
@@ -296,12 +296,51 @@ class KampDataLoader:
                  get_useful_p_data=False, 
 
                  do_resample=True,
-                 downsampled_pass_rate=0.6, 
-                 upsampled_fail_rate_about_pass=0.15,
+                 downsampled_pass_rate=0.5, 
+                 upsampled_fail_rate_about_pass=1.0,
                  upsample_method='smote',
                  
                  do_pca=False,
                  variance_rate=0.95):
+        '''
+        [Parameters]
+        1. path 
+            - Raw data 경로
+        2. nan_grid (default=NAN_GRID) 
+            - 결측치 처리를 위한 설정값 Dict
+            - 재설정 필요 시 'NAN_GRID'를 Import 하여 변경 후 재설정
+        3. encode_grid (default=NAN_GRID)
+            - 범주형 feature encoding을 위한 설정값 Dict
+            - 재설정 필요 시 'NAN_GRID'를 Import 하여 변경 후 재설정
+        4. do_count_trend (defaut=True)
+            - 'count' 변수를 구간화 하는 feature를 추가할 지 여부
+        5. drop_count (default=True)
+            - 'count_trend' 변수 생성 후 기존 'count' 변수를 drop할 지 여부
+        6. outlier_method (defaul='iso')
+            - 이상치 제거 방식 지정
+            - 'iso' : 'isolation-forest' 방식 사용
+            - 'lof' : 'LOF' 방식 사용
+        7. iso_outlier_rate (default=0.015)
+            - 'iso' 방식으로 이상치 제거 시 설정할 전체 데이터에서의 예상되는 이상치 비율
+        8. p_threshold (default=0.05)
+            - 의미 있는 feature를 구분할 p-value 기준 값
+        9. get_useful_p_data (default=False)
+            - p-value가 p_threshold의 설정값보다 높은 feature만 남길 지 여부
+        10. do_resample
+            - 클래스 불균형 해결을 위한 resampling을 진행할 지 여부
+        11. downsampling_pass_rate (default=0.5)
+            - 전체 데이터 중 pass 클래스인 데이터에 대해 남길 pass 데이터의 비율
+            - 1.0으로 생성 시 모든 pass 데이터 생성
+        12. upsample_fail_rate_about_pass (default='1.0')
+            - downsampling 이후 upsampling 진행 시 pass 데이터에 대해 fail 데이터가 차지할 비율
+            - 1.0으로 설정 시 pass 데이터와 동일한 양까지 생성
+        13. upsample_method (default='smote')
+            - upsampling을 진행할 방식 지정
+        14. do_pca (defalut=False)
+            - pca를 진행할 지 여부
+        15. varance_rate (default=0.95)
+            - pca 진행 시 선정된 주성분이 설명해야할 전체 분산에서의 비율
+        '''
         
         self.path = path
 
@@ -318,7 +357,7 @@ class KampDataLoader:
         self.p_threshold = p_threshold
         self.get_useful_p_data = get_useful_p_data
 
-        self.do_resample = do_resample,
+        self.do_resample = do_resample
         self.downsampled_pass_rate = downsampled_pass_rate
         self.upsampled_fail_rate_about_pass = upsampled_fail_rate_about_pass
         self.upsample_method = upsample_method
@@ -378,30 +417,30 @@ class KampDataLoader:
             print("[Process Log] Done\n")
         
         # 데이터 스케일링 (MinMaxScaler)
-        print("[Process Log] Data Scaling (MinMaxScaler)...")
-        data_input = data.drop(columns=['passorfail'])
+        if self.do_count_trend:
+            print("[Process Log] Data Scaling (MinMaxScaler)...")
+            cat_data = data[['working', 'EMS_operation_time', 'mold_code', 'heating_furnace', 'count_trend']]
+            data_input = data.drop(columns=['passorfail', 'working', 'EMS_operation_time', 'mold_code', 'heating_furnace', 'count_trend'])
+        else:
+            print("[Process Log] Data Scaling (MinMaxScaler)...")
+            cat_data = data[['working', 'EMS_operation_time', 'mold_code', 'heating_furnace']]
+            data_input = data.drop(columns=['passorfail', 'working', 'EMS_operation_time', 'mold_code', 'heating_furnace'])     
+        cat_data = cat_data.reset_index(drop=True)
+        data_input = data_input.reset_index(drop=True)
         input_feature_names = data_input.columns
         data_label = data['passorfail']
         scaler = MinMaxScaler()
         data_input = scaler.fit_transform(data_input)
         data_input = pd.DataFrame(data_input, columns=input_feature_names)
+        data_input = pd.concat([data_input, cat_data], axis=1)
         print("[Process Log] Done\n")
 
-        if self.do_count_trend:
-            remapping_features = ['working', 'EMS_operation_time', 'mold_code', 'heating_furnace', 'count_trend']
-            for feature in remapping_features:
-                data_input[feature] = data_input[feature].apply(lambda x : round(x))
-        else:
-            remapping_features = ['working', 'EMS_operation_time', 'mold_code', 'heating_furnace']
-            for feature in remapping_features:
-                data_input[feature] = data_input[feature].apply(lambda x : round(x))
-
- 
+        # PCA 진행
         if self.do_pca:
             print("[Process Log] PCA..")
             data_input = PCAProcessor(variance_rate=self.variance_rate).process(data=data)
             print("[Process Log] Done\n")
-
+        
 
         # 학습-평가 데이터 분할
         print("[Process Log] Train Test Spliting...")
@@ -413,26 +452,39 @@ class KampDataLoader:
         )
         print("[Process Log] Done\n")
 
+        train_data = train_data.reset_index(drop=True)
+        train_label = train_label.reset_index(drop=True)
+        test_data = test_data.reset_index(drop=True)
+        test_label = test_label.reset_index(drop=True)
+
         # 데이터 리샘플링
         if self.do_resample:
             print(f"[Process Log] Data Resampling ({self.upsample_method})...")
-            x_train, y_train, x_test, y_test = DataResampler(downsampled_pass_rate=self.downsampled_pass_rate,
+            train_data, train_label = DataResampler(downsampled_pass_rate=self.downsampled_pass_rate,
                                                              upsampled_fail_rate_about_pass=self.upsampled_fail_rate_about_pass,
                                                              upsample_method=self.upsample_method,
-                                                             with_pca=self.do_pca).process(train_data, train_label, test_data, test_label)
+                                                             with_pca=self.do_pca).process(train_data, train_label)
             print("[Process Log] Done\n")
+        
+        if self.do_count_trend:
+            remapping_features = ['working', 'EMS_operation_time', 'mold_code', 'heating_furnace', 'count_trend']
+            for feature in remapping_features:
+                train_data[feature] = train_data[feature].apply(lambda x : round(x))
+                test_data[feature] = test_data[feature].apply(lambda x : round(x))
+        else:
+            remapping_features = ['working', 'EMS_operation_time', 'mold_code', 'heating_furnace']
+            for feature in remapping_features:
+                train_data[feature] = train_data[feature].apply(lambda x : round(x))
+                test_data[feature] = test_data[feature].apply(lambda x : round(x))
 
         self.data = {
-            'train_data' : x_train,
-            'train_label' : y_train,
-            'test_data' : x_test,
-            'test_label' : y_test
+            'train_data' : train_data,
+            'train_label' : train_label,
+            'test_data' : test_data,
+            'test_label' : test_label
         }
 
         print('='*23, '[Done]', '='*23)
 
     def load(self):
         return self.data
-    
-    def save(self, path):
-        self.data.to_csv(path, encoding='cp949', index=False)
