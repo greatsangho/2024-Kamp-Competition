@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.init as init
+import math
 from tqdm import tqdm
 
 class InceptionModule(nn.Module):
@@ -77,26 +79,46 @@ class ClassifierModule(nn.Module):
     def __init__(self):
         super(ClassifierModule, self).__init__()
 
-        self.fc_1 = nn.Linear(in_features=17, out_features=20)
+        self.fc_1 = nn.Linear(in_features=17, out_features=10)
+        self.bn_1 = nn.BatchNorm1d(10)
         self.relu_1 = nn.ReLU()
-        self.fc_2 = nn.Linear(in_features=20, out_features=16)
+
+        self.fc_2 = nn.Linear(in_features=10, out_features=6)
+        self.bn_2 = nn.BatchNorm1d(6)
         self.relu_2 = nn.ReLU()
-        self.fc_3 = nn.Linear(in_features=16, out_features=8)
-        self.relu_3 = nn.ReLU()
-        self.fc_4 = nn.Linear(in_features=8, out_features=2)
+
+        self.fc_3 = nn.Linear(in_features=6, out_features=2)
         self.softmax = nn.Softmax(dim=-1)
+
+        init.kaiming_uniform_(self.fc_1.weight, a=math.sqrt(5))
+        init.kaiming_uniform_(self.fc_2.weight, a=math.sqrt(5))
+        init.kaiming_uniform_(self.fc_3.weight, a=math.sqrt(5))
+
+        if self.fc_1.bias is not None:
+            fan_in, _ = init._calculate_fan_in_and_fan_out(self.fc_1.weight)
+            bound = 1 / math.sqrt(fan_in)
+            init.uniform_(self.fc_1.bias, -bound, bound)
+
+        if self.fc_2.bias is not None:
+            fan_in, _ = init._calculate_fan_in_and_fan_out(self.fc_2.weight)
+            bound = 1 / math.sqrt(fan_in)
+            init.uniform_(self.fc_2.bias, -bound, bound)
+
+        if self.fc_3.bias is not None:
+            fan_in, _ = init._calculate_fan_in_and_fan_out(self.fc_3.weight)
+            bound = 1 / math.sqrt(fan_in)
+            init.uniform_(self.fc_3.bias, -bound, bound)
     
     def forward(self, x):
         x = self.fc_1(x)
+        x = self.bn_1(x)
         x = self.relu_1(x)
         
         x = self.fc_2(x)
+        x = self.bn_2(x)
         x = self.relu_2(x)
 
         x = self.fc_3(x)
-        x = self.relu_3(x)
-
-        x = self.fc_4(x)
         x = self.softmax(x)
 
         return x
@@ -108,12 +130,12 @@ class InceptionModel(nn.Module):
 
         # inception layer 1
         num_feature_maps_1 = {
-            'branch_1' : 1024,
-            'branch_2_1' : 1024,
-            'branch_2_2' : 512,
-            'branch_3_1' : 512,
-            'branch_3_2' : 256,
-            'branch_4': 256
+            'branch_1' : 512,
+            'branch_2_1' : 512,
+            'branch_2_2' : 256,
+            'branch_3_1' : 256,
+            'branch_3_2' : 128,
+            'branch_4': 512
         }
         self.inception_layer_1 = InceptionModule(
             input_channels = 1,
@@ -122,12 +144,12 @@ class InceptionModel(nn.Module):
 
         # inception layer 2
         num_feature_maps_2 = {
-            'branch_1' : 512,
-            'branch_2_1' : 512,
-            'branch_2_2' : 256,
-            'branch_3_1' : 256,
-            'branch_3_2' : 128,
-            'branch_4': 128
+            'branch_1' : 256,
+            'branch_2_1' : 256,
+            'branch_2_2' : 128,
+            'branch_3_1' : 128,
+            'branch_3_2' : 64,
+            'branch_4': 256
         }
         self.inception_layer_2 = InceptionModule(
             input_channels = num_feature_maps_1['branch_1'] 
@@ -137,14 +159,14 @@ class InceptionModel(nn.Module):
             num_feature_maps = num_feature_maps_2
         )
 
-        # inception layer 2
+        # inception layer 3
         num_feature_maps_3 = {
-            'branch_1' : 256,
-            'branch_2_1' : 256,
-            'branch_2_2' : 128,
-            'branch_3_1' : 128,
-            'branch_3_2' : 64,
-            'branch_4': 64
+            'branch_1' : 128,
+            'branch_2_1' : 128,
+            'branch_2_2' : 64,
+            'branch_3_1' : 64,
+            'branch_3_2' : 32,
+            'branch_4': 128
         }
         self.inception_layer_3 = InceptionModule(
             input_channels = num_feature_maps_2['branch_1'] 
@@ -171,7 +193,7 @@ class InceptionModel(nn.Module):
         return x
 
 
-class KampInceptionResNet:
+class KampInceptionNet:
     def __init__(self, criterion=None, optimizer=None, lr=0.01, epochs=10):
         self.model = InceptionModel()
         self.lr = lr
@@ -187,6 +209,8 @@ class KampInceptionResNet:
             self.optimizer = optim.Adam(self.model.parameters(), self.lr)
         else:
             self.optimizer = optimizer
+        
+        self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=3, gamma=0.1)
         
     def fit(self, dataloader):
         for epoch in range(self.epochs):
@@ -204,9 +228,11 @@ class KampInceptionResNet:
 
                 self.optimizer.step()
 
+                self.scheduler.step()
+
                 epoch_loss += loss.item()
             
-                iterator.set_description_str(f"[Epoch > {epoch} | Loss > {epoch_loss/len(dataloader):.4f}] ")
+                iterator.set_description_str(f"[Epoch {epoch + 1} | Loss {epoch_loss/len(dataloader):.4f}] ")
             
             self.history.append(epoch_loss)
         
