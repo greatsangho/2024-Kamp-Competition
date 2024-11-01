@@ -244,7 +244,7 @@ class KampInceptionNet:
 
 
 class KampVoter:
-    def __init__(self, voting_models, voting_method='hard'):
+    def __init__(self, voting_models, model_weights=None, voting_method='hard'):
         self.voting_models = voting_models
         
         self.voting_method=voting_method
@@ -252,6 +252,7 @@ class KampVoter:
         self.voting_classifier = VotingClassifier(
             estimators = [(model_name, model) for model_name, model in self.voting_models.items()],
             voting=self.voting_method,
+            weights=model_weights,
             verbose=1
         )
     
