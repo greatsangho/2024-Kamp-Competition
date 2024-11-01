@@ -4,6 +4,8 @@ import torch.optim as optim
 import torch.nn.init as init
 import math
 from tqdm import tqdm
+from sklearn.ensemble import VotingClassifier
+from sklearn.metrics import f1_score, confusion_matrix, classification_report
 
 class InceptionModule(nn.Module):
     def __init__(self, input_channels, num_feature_maps):
@@ -237,3 +239,33 @@ class KampInceptionNet:
             self.history.append(epoch_loss)
         
         return self.model, self.history
+    
+
+
+
+class KampVoter:
+    def __init__(self, voting_models, voting_method='hard'):
+        self.voting_models = voting_models
+        
+        self.voting_method=voting_method
+
+        self.voting_classifier = VotingClassifier(
+            estimators = [(model_name, model) for model_name, model in self.voting_models.items()],
+            voting=self.voting_method,
+            verbose=1
+        )
+    
+    def fit(self, data, label):
+        self.voting_classifier.fit(data, label)
+
+        return self.voting_classifier
+    
+    def evaluate(self, data, label):
+        y_pred = self.voting_classifier.predict(data)
+
+        print(f"f1_score : {f1_score(label, y_pred)}\n")
+        print(f"confusion matrix : \n{confusion_matrix(label, y_pred)}\n")
+        print(f"classification report : \n{classification_report(label, y_pred)}\n")
+    
+    def predict(self, data):
+        return self.voting_classifier.predict(data)
