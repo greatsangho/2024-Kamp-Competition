@@ -301,7 +301,8 @@ class KampDataLoader:
                  upsample_method='smote',
                  
                  do_pca=False,
-                 variance_rate=0.95):
+                 variance_rate=0.95,
+                 scale_include_cat=True):
         '''
         [Parameters]
         1. path 
@@ -340,6 +341,8 @@ class KampDataLoader:
             - pca를 진행할 지 여부
         15. varance_rate (default=0.95)
             - pca 진행 시 선정된 주성분이 설명해야할 전체 분산에서의 비율
+        16. scale_include_cat (default=True)
+            - scaling 적용 시 '범주형 변수'도 포함하여 스케일링 할 지 여부
         '''
         
         self.path = path
@@ -364,6 +367,8 @@ class KampDataLoader:
 
         self.do_pca = do_pca
         self.variance_rate = variance_rate
+
+        self.scale_include_cat = scale_include_cat
     
     def process(self):
         print('='*20, '[Data Process Start]', '='*20, '\n')
@@ -417,23 +422,33 @@ class KampDataLoader:
             print("[Process Log] Done\n")
         
         # 데이터 스케일링 (MinMaxScaler)
-        if self.do_count_trend:
-            print("[Process Log] Data Scaling (MinMaxScaler)...")
-            cat_data = data[['working', 'EMS_operation_time', 'mold_code', 'heating_furnace', 'count_trend']]
-            data_input = data.drop(columns=['passorfail', 'working', 'EMS_operation_time', 'mold_code', 'heating_furnace', 'count_trend'])
+        if not self.scale_include_cat:
+            if self.do_count_trend:
+                print("[Process Log] Data Scaling (MinMaxScaler)...")
+                cat_data = data[['working', 'EMS_operation_time', 'mold_code', 'heating_furnace', 'count_trend']]
+                data_input = data.drop(columns=['passorfail', 'working', 'EMS_operation_time', 'mold_code', 'heating_furnace', 'count_trend'])
+            else:
+                print("[Process Log] Data Scaling (MinMaxScaler)...")
+                cat_data = data[['working', 'EMS_operation_time', 'mold_code', 'heating_furnace']]
+                data_input = data.drop(columns=['passorfail', 'working', 'EMS_operation_time', 'mold_code', 'heating_furnace'])     
+            cat_data = cat_data.reset_index(drop=True)
+            data_input = data_input.reset_index(drop=True)
+            input_feature_names = data_input.columns
+            data_label = data['passorfail']
+            scaler = MinMaxScaler()
+            data_input = scaler.fit_transform(data_input)
+            data_input = pd.DataFrame(data_input, columns=input_feature_names)
+            data_input = pd.concat([data_input, cat_data], axis=1)
+            print("[Process Log] Done\n")
         else:
             print("[Process Log] Data Scaling (MinMaxScaler)...")
-            cat_data = data[['working', 'EMS_operation_time', 'mold_code', 'heating_furnace']]
-            data_input = data.drop(columns=['passorfail', 'working', 'EMS_operation_time', 'mold_code', 'heating_furnace'])     
-        cat_data = cat_data.reset_index(drop=True)
-        data_input = data_input.reset_index(drop=True)
-        input_feature_names = data_input.columns
-        data_label = data['passorfail']
-        scaler = MinMaxScaler()
-        data_input = scaler.fit_transform(data_input)
-        data_input = pd.DataFrame(data_input, columns=input_feature_names)
-        data_input = pd.concat([data_input, cat_data], axis=1)
-        print("[Process Log] Done\n")
+            data_input = data.reset_index(drop=True)
+            input_feature_names = data_input.columns
+            data_label = data['passorfail']
+            scaler = MinMaxScaler()
+            data_input = scaler.fit_transform(data_input)
+            data_input = pd.DataFrame(data_input, columns=input_feature_names)
+            print("[Process Log] Done\n")
 
         # PCA 진행
         if self.do_pca:
@@ -466,16 +481,16 @@ class KampDataLoader:
                                                              with_pca=self.do_pca).process(train_data, train_label)
             print("[Process Log] Done\n")
         
-        if self.do_count_trend:
-            remapping_features = ['working', 'EMS_operation_time', 'mold_code', 'heating_furnace', 'count_trend']
-            for feature in remapping_features:
-                train_data[feature] = train_data[feature].apply(lambda x : round(x))
-                test_data[feature] = test_data[feature].apply(lambda x : round(x))
-        else:
-            remapping_features = ['working', 'EMS_operation_time', 'mold_code', 'heating_furnace']
-            for feature in remapping_features:
-                train_data[feature] = train_data[feature].apply(lambda x : round(x))
-                test_data[feature] = test_data[feature].apply(lambda x : round(x))
+        # if self.do_count_trend:
+        #     remapping_features = ['working', 'EMS_operation_time', 'mold_code', 'heating_furnace', 'count_trend']
+        #     for feature in remapping_features:
+        #         train_data[feature] = train_data[feature].apply(lambda x : round(x))
+        #         test_data[feature] = test_data[feature].apply(lambda x : round(x))
+        # else:
+        #     remapping_features = ['working', 'EMS_operation_time', 'mold_code', 'heating_furnace']
+        #     for feature in remapping_features:
+        #         train_data[feature] = train_data[feature].apply(lambda x : round(x))
+        #         test_data[feature] = test_data[feature].apply(lambda x : round(x))
 
         self.data = {
             'train_data' : train_data,
