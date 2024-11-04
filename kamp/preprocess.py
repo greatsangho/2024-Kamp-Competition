@@ -442,7 +442,7 @@ class KampDataLoader:
             print("[Process Log] Done\n")
         else:
             print("[Process Log] Data Scaling (MinMaxScaler)...")
-            data_input = data.reset_index(drop=True)
+            data_input = data.drop(columns=['passorfail'])
             input_feature_names = data_input.columns
             data_label = data['passorfail']
             scaler = MinMaxScaler()
