@@ -143,7 +143,7 @@ class T_Testor:
 def remove_outliers_by_isoforest(data, outlier_rate=0.015):
 
     iso_forest = IsolationForest(
-        n_estimators=500, 
+        n_estimators=4000, 
         contamination=outlier_rate, 
         random_state=42
     )
@@ -399,6 +399,9 @@ class KampDataLoader:
         data = CatFeatureEncoder(encode_grid=self.encode_grid).process(data)
         print("[Process Log] Done\n")
 
+        # 중복 데이터 처리
+        data = data.drop_duplicates()
+
         # 이상치 처리
         # IsolationForest 방식
         if self.outlier_method == 'iso':
@@ -425,12 +428,15 @@ class KampDataLoader:
         if not self.scale_include_cat:
             if self.do_count_trend:
                 print("[Process Log] Data Scaling (MinMaxScaler)...")
-                cat_data = data[['working', 'EMS_operation_time', 'mold_code', 'heating_furnace', 'count_trend']]
+                # cat_data = data[['working', 'EMS_operation_time', 'mold_code', 'heating_furnace', 'count_trend']]
+                cat_data = data[['EMS_operation_time', 'mold_code', 'heating_furnace', 'count_trend']]
                 data_input = data.drop(columns=['passorfail', 'working', 'EMS_operation_time', 'mold_code', 'heating_furnace', 'count_trend'])
             else:
                 print("[Process Log] Data Scaling (MinMaxScaler)...")
-                cat_data = data[['working', 'EMS_operation_time', 'mold_code', 'heating_furnace']]
-                data_input = data.drop(columns=['passorfail', 'working', 'EMS_operation_time', 'mold_code', 'heating_furnace'])     
+                # cat_data = data[['working', 'EMS_operation_time', 'mold_code', 'heating_furnace']]
+                cat_data = data[['EMS_operation_time', 'mold_code', 'heating_furnace']]
+                # data_input = data.drop(columns=['passorfail', 'working', 'EMS_operation_time', 'mold_code', 'heating_furnace'])
+                data_input = data.drop(columns=['passorfail', 'EMS_operation_time', 'mold_code', 'heating_furnace'])     
             cat_data = cat_data.reset_index(drop=True)
             data_input = data_input.reset_index(drop=True)
             input_feature_names = data_input.columns
