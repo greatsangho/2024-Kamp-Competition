@@ -37,19 +37,46 @@ def load_data(path):
 
     return data_configs
 
-def check_fail_rate(data):
-    num_pass = len(data[data['passorfail'] == 0])
-    num_fail = len(data[data['passorfail'] == 1])
+def load_preprocessed_unscaled_data(data_path):
 
-    print(f"합격 데이터 수 : {num_pass}")
-    print(f"불합격 데이터 수 : {num_fail}")
-    print(f"불합격 데이터 비율 : {round(num_fail / (num_pass + num_fail) * 100, 2)} %")
+    # Load Raw Data
+    print(f'[Process Log] Load Raw Data')
+    data_configs = load_data(data_path)
+    data = data_configs['data']
+    numeric_features = data_configs['numeric_features']
+    print(f'[Process Log] Done\n')
 
-def check_nan(data, percent=False):
-    if percent:
-        print(data.isna().sum() / len(data))
-    else:
-        print(data.isna().sum())
+    # Nan Data Process
+    print(f'[Process Log] Process Nan Value')
+    data = NanProcessor(nan_grid=NAN_GRID).process(data)
+    print(f'[Process Log] Done\n')
+
+    # Encoding
+    print(f'[Process Log] Encoding Categorical Features')
+    data = CatFeatureEncoder(encode_grid=ENCODE_GRID).process(data)
+    print(f'[Process Log] Done\n')
+
+    print(f'[Process Log] Drop Duplicates')
+    data = data.drop_duplicates()
+    print(f'[Process Log] Done\n')
+
+    # Remove Outlier
+    print(f'[Process Log] Remove Outliers (LOF)')
+    numeric_features = [feature for feature in numeric_features 
+                            if feature not in ['count', 'molten_volume', 'mold_code']]
+    data = remove_outlier_by_lof(data, numeric_features)
+    print(f'[Process Log] Done\n')
+
+    # T-Test
+    print(f'[Process Log] T-Testing')
+    t_test = T_Testor(p_threshold=0.05)
+    t_test_configs = t_test.test(data)
+    data = t_test.get_useful_data(data)
+    print(f'[Process Log] Done\n')
+
+    data = data.reset_index(drop=True)
+
+    return data
 
 class NanProcessor:
     def __init__(self, nan_grid):
@@ -171,10 +198,6 @@ class DataResampler:
         self.with_pca = with_pca
     
     def process(self, train_data, train_label):
-        # train_data = train_data.reset_index(drop=True)
-        # test_data = test_data.reset_index(drop=True)
-        # train_label = train_label.reset_index(drop=True)
-        # test_label = test_label.reset_index(drop=True)
 
         fail_data = train_data[train_label == 1]
         pass_data = train_data[train_label == 0]
@@ -196,16 +219,8 @@ class DataResampler:
             )
         downsampled_pass_label = train_label[downsampled_pass_data.index]
 
-        # not_used_pass_data = pass_data.drop(downsampled_pass_data.index)
-        # not_used_pass_label = train_label[pass_data.index].drop(downsampled_pass_data.index)
-
         downsampled_pass_data = downsampled_pass_data.reset_index(drop=True)
         downsampled_pass_label = downsampled_pass_label.reset_index(drop=True)
-        # not_used_pass_data = not_used_pass_data.reset_index(drop=True)
-        # not_used_pass_label = not_used_pass_label.reset_index(drop=True)
-
-        # test_data = pd.concat([test_data, not_used_pass_data], axis=0).reset_index(drop=True)
-        # test_label = pd.concat([test_label, not_used_pass_label], axis=0).reset_index(drop=True)
 
         train_data = pd.concat([fail_data, downsampled_pass_data], axis=0).reset_index(drop=True)
         train_label = pd.concat([train_label[fail_data.index], downsampled_pass_label], axis=0).reset_index(drop=True)
@@ -428,14 +443,11 @@ class KampDataLoader:
         if not self.scale_include_cat:
             if self.do_count_trend:
                 print("[Process Log] Data Scaling (MinMaxScaler)...")
-                # cat_data = data[['working', 'EMS_operation_time', 'mold_code', 'heating_furnace', 'count_trend']]
                 cat_data = data[['EMS_operation_time', 'mold_code', 'heating_furnace', 'count_trend']]
                 data_input = data.drop(columns=['passorfail', 'working', 'EMS_operation_time', 'mold_code', 'heating_furnace', 'count_trend'])
             else:
                 print("[Process Log] Data Scaling (MinMaxScaler)...")
-                # cat_data = data[['working', 'EMS_operation_time', 'mold_code', 'heating_furnace']]
                 cat_data = data[['EMS_operation_time', 'mold_code', 'heating_furnace']]
-                # data_input = data.drop(columns=['passorfail', 'working', 'EMS_operation_time', 'mold_code', 'heating_furnace'])
                 data_input = data.drop(columns=['passorfail', 'EMS_operation_time', 'mold_code', 'heating_furnace'])     
             cat_data = cat_data.reset_index(drop=True)
             data_input = data_input.reset_index(drop=True)
@@ -486,17 +498,6 @@ class KampDataLoader:
                                                              upsample_method=self.upsample_method,
                                                              with_pca=self.do_pca).process(train_data, train_label)
             print("[Process Log] Done\n")
-        
-        # if self.do_count_trend:
-        #     remapping_features = ['working', 'EMS_operation_time', 'mold_code', 'heating_furnace', 'count_trend']
-        #     for feature in remapping_features:
-        #         train_data[feature] = train_data[feature].apply(lambda x : round(x))
-        #         test_data[feature] = test_data[feature].apply(lambda x : round(x))
-        # else:
-        #     remapping_features = ['working', 'EMS_operation_time', 'mold_code', 'heating_furnace']
-        #     for feature in remapping_features:
-        #         train_data[feature] = train_data[feature].apply(lambda x : round(x))
-        #         test_data[feature] = test_data[feature].apply(lambda x : round(x))
 
         self.data = {
             'train_data' : train_data,

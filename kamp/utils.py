@@ -35,3 +35,17 @@ def evaluate_model(model, dataloader):
             all_labels.extend(y_batch.cpu().numpy())
 
     return np.array(all_labels), np.array(all_predictions)
+
+def check_fail_rate(data):
+    num_pass = len(data[data['passorfail'] == 0])
+    num_fail = len(data[data['passorfail'] == 1])
+
+    print(f"합격 데이터 수 : {num_pass}")
+    print(f"불합격 데이터 수 : {num_fail}")
+    print(f"불합격 데이터 비율 : {round(num_fail / (num_pass + num_fail) * 100, 2)} %")
+
+def check_nan(data, percent=False):
+    if percent:
+        print(data.isna().sum() / len(data))
+    else:
+        print(data.isna().sum())
