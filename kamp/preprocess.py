@@ -448,7 +448,7 @@ class KampDataLoader:
             print("[Process Log] Done\n")
         else:
             print("[Process Log] Data Scaling (MinMaxScaler)...")
-            data_input = data.reset_index(drop=True)
+            data_input = data.drop(columns=['passorfail'])
             input_feature_names = data_input.columns
             data_label = data['passorfail']
             scaler = MinMaxScaler()
@@ -467,7 +467,7 @@ class KampDataLoader:
         print("[Process Log] Train Test Spliting...")
         train_data, test_data, train_label, test_label = train_test_split(
             data_input, data_label,
-            test_size=0.2,
+            test_size=0.25,
             stratify=data_label,
             random_state=42
         )
