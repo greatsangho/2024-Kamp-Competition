@@ -467,7 +467,7 @@ class KampDataLoader:
         print("[Process Log] Train Test Spliting...")
         train_data, test_data, train_label, test_label = train_test_split(
             data_input, data_label,
-            test_size=0.25,
+            test_size=0.2,
             stratify=data_label,
             random_state=42
         )
