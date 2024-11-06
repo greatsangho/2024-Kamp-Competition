@@ -1,5 +1,8 @@
 import numpy as np
 from tqdm import tqdm
+from sklearn.metrics import classification_report, f1_score, confusion_matrix
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 import torch
 from torch.utils.data import Dataset
@@ -49,3 +52,28 @@ def check_nan(data, percent=False):
         print(data.isna().sum() / len(data))
     else:
         print(data.isna().sum())
+
+
+def evaluation_model(model, data, label):
+    y_pred = model.predict(data)
+
+    print(f"f1_score : {f1_score(label, y_pred)}\n")
+    print(f"confusion matrix : \n{confusion_matrix(label, y_pred)}\n")
+    print(f"classification report : \n{classification_report(label, y_pred)}\n")
+
+    corr_mat = confusion_matrix(label, y_pred)
+
+    fig, axe = plt.subplots(figsize=(20, 20))
+    sns.heatmap(corr_mat,
+                annot=True,
+                cmap='Spectral_r',
+                fmt='.2f',
+                vmin=0,
+                vmax=17500,
+                center=0,
+                annot_kws={'size' : 10, 'size' : 15},
+                linewidths=0.5,
+                ax=axe)
+
+    plt.title('Confusion Matrix', fontsize=15)
+    plt.show()
